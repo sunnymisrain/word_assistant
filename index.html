@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI单词助手 - 完整版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        input {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        .word-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .word {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .definition {
+            font-size: 18px;
+            color: #555;
+            margin-bottom: 15px;
+        }
+        .example {
+            background: #e8eaf6;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+        .etymology, .synonyms {
+            margin-top: 10px;
+            color: #666;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+        .error {
+            color: red;
+            padding: 10px;
+        }
+        .review-buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .btn-forgot { background: #f56565; }
+        .btn-hard { background: #ed8936; }
+        .btn-good { background: #48bb78; }
+        .btn-easy { background: #38b2ac; }
+        .due-count {
+            background: #667eea;
+            color: white;
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 14px;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        .word-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .word-item {
+            border-bottom: 1px solid #e0e0e0;
+            padding: 15px;
+            cursor: pointer;
+        }
+        .word-item:hover {
+            background: #f0f0f0;
+        }
+        .word-title {
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .review-date {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        .delete-btn {
+            background: #f56565;
+            padding: 5px 10px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📚 AI单词助手</h1>
+            <p class="subtitle">输入单词，AI自动生成释义、例句、词根和近义词</p >
+            
+            <div>
+                <input type="text" id="wordInput" placeholder="输入一个单词，比如：apple" />
+                <button onclick="generateWord()">✨ AI生成单词卡</button>
+            </div>
+            
+            <div id="result"></div>
+        </div>
+        
+        <div class="card">
+            <h2>📝 我的单词本 <span id="wordCount">(0)</span></h2>
+            <div id="wordList" class="word-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // 存储所有单词
+        let words = [];
+        
+        // 加载数据
+        function loadData() {
+            const saved = localStorage.getItem('words');
+            if (saved) {
+                words = JSON.parse(saved);
+            }
+            displayWordList();
+        }
+        
+        // 保存数据
+        function saveData() {
+            localStorage.setItem('words', JSON.stringify(words));
+            displayWordList();
+        }
+        
+        // 显示单词列表
+        function displayWordList() {
+            const wordListDiv = document.getElementById('wordList');
+            const wordCountSpan = document.getElementById('wordCount');
+            
+            wordCountSpan.textContent = `(${words.length})`;
+            
+            if (words.length === 0) {
+                wordListDiv.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">还没有单词，输入一个单词开始吧~</p >';
+                return;
+            }
+            
+            let html = '';
+            for (let i = 0; i < words.length; i++) {
+                const w = words[i];
+                const reviewDate = new Date(w.nextReview);
+                const today = new Date();
+                const isDue = reviewDate <= today;
+                
+                html += `
+                    <div class="word-item" onclick="showWordDetail(${i})">
+                        <div class="word-title">
+                            ${w.word}
+                            ${isDue ? ' 🔔' : ''}
+                        </div>
+                        <div class="review-date">
+                            下次复习: ${w.nextReview}
+                        </div>
+                        <div id="detail-${i}" style="display: none; margin-top: 10px;">
+                            <div class="definition">📖 ${w.definition}</div>
+                            <div class="example">💬 ${w.example}</div>
+                            <div class="etymology">🔤 词根：${w.etymology}</div>
+                            <div class="synonyms">📚 近义词：${w.synonyms}</div>
+                            <div class="review-buttons">
+                                <button class="btn-forgot" onclick="event.stopPropagation(); reviewWord(${i}, 2)">❌ 忘记</button>
+                                <button class="btn-hard" onclick="event.stopPropagation(); reviewWord(${i}, 3)">🤔 困难</button>
+                                <button class="btn-good" onclick="event.stopPropagation(); reviewWord(${i}, 4)">✅ 记住</button>
+                                <button class="btn-easy" onclick="event.stopPropagation(); reviewWord(${i}, 5)">⭐ 容易</button>
+                            </div>
+                            <button class="delete-btn" onclick="event.stopPropagation(); deleteWord(${i})">🗑️ 删除</button>
+                        </div>
+                    </div>
+                `;
+            }
+            wordListDiv.innerHTML = html;
+        }
+        
+        // 显示/隐藏单词详情
+        function showWordDetail(index) {
+            const detail = document.getElementById(`detail-${index}`);
+            if (detail.style.display === 'none') {
+                detail.style.display = 'block';
+            } else {
+                detail.style.display = 'none';
+            }
+        }
+        
+        // 删除单词
+        function deleteWord(index) {
+            if (confirm('确定要删除这个单词吗？')) {
+                words.splice(index, 1);
+                saveData();
+            }
+        }
+        
+        // 复习单词（SM-2算法）
+        function reviewWord(index, quality) {
+            const word = words[index];
+            
+            if (quality >= 3) {
+                if (word.interval === 1) {
+                    word.interval = 1;
+                } else {
+                    word.interval = Math.round(word.interval * word.easeFactor);
+                }
+                word.easeFactor = word.easeFactor + (0.1 - (5 - quality) * 0.08);
+                if (word.easeFactor < 1.3) word.easeFactor = 1.3;
+                
+                let days = word.interval;
+                let date = new Date();
+                date.setDate(date.getDate() + days);
+                word.nextReview = date.toISOString().split('T')[0];
+            } else {
+                word.interval = 1;
+                let date = new Date();
+                date.setDate(date.getDate() + 1);
+                word.nextReview = date.toISOString().split('T')[0];
+            }
+            
+            saveData();
+            alert(`复习完成！下次复习时间：${word.nextReview}`);
+        }
+        
+        // 调用DeepSeek API生成单词
+        async function generateWord() {
+            const word = document.getElementById('wordInput').value.trim();
+            if (!word) {
+                alert('请输入单词');
+                return;
+            }
+            
+            // 检查是否已存在
+            if (words.some(w => w.word === word)) {
+                alert('这个单词已经在单词本里了！');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="loading">🤖 AI正在生成单词卡片...</div>';
+            
+            try {
+                const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer sk-007b98a11e9f45f3b8b26de99385bcb0'
+                    },
+                    body: JSON.stringify({
+                        model: 'deepseek-chat',
+                        messages: [
+                            {
+                                role: 'user',
+                                content: `为单词"${word}"生成学习卡片，要求：
+1. 中文释义
+2. 一个例句（带中文翻译）
+3. 词根拆解
+4. 2个近义词
+
+请只返回JSON，不要有其他文字，格式如下：
+{"definition": "...", "example": "...", "etymology": "...", "synonyms": "..."}`
+                            }
+                        ],
+                        temperature: 0.7
+                    })
+                });
+                
+                const data = await response.json();
+                const content = data.choices[0].message.content;
+                const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
+                const card = JSON.parse(cleanContent);
+                
+                // 添加到单词本
+                const newWord = {
+                    word: word,
+                    definition: card.definition,
+                    example: card.example,
+                    etymology: card.etymology,
+                    synonyms: card.synonyms,
+                    nextReview: new Date().toISOString().split('T')[0],
+                    interval: 1,
+                    easeFactor: 2.5
+                };
+                
+                words.push(newWord);
+                saveData();
+                
+                resultDiv.innerHTML = `
+                    <div class="word-card">
+                        <div class="word">✅ 已添加：${word}</div>
+                        <div class="definition">📖 ${card.definition}</div>
+                        <div class="example">💬 ${card.example}</div>
+                        <div class="etymology">🔤 词根：${card.etymology}</div>
+                        <div class="synonyms">📚 近义词：${card.synonyms}</div>
+                        <p style="margin-top: 10px; color: green;">✅ 已保存到单词本！</p >
+                    </div>
+                `;
+                document.getElementById('wordInput').value = '';
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ 生成失败：${error.message}<br>请检查API Key是否正确</div>`;
+            }
+        }
+        
+        // 初始化
+        loadData();
+    </script>
+</body>
+</html>
