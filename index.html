@@ -250,6 +250,29 @@
     </style>
 </head>
 <body>
+    <div id="audioPermission" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; padding: 20px; border-radius: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.2); z-index: 9999;">
+    <p style="margin-bottom: 15px;">🔊 点击下方按钮，开启语音朗读</p >
+    <button onclick="enableAudio()" style="background: #ff9bc0; color: white; border: none; padding: 10px 20px; border-radius: 30px;">🎤 点击我开启声音</button>
+</div>
+
+<script>
+    function enableAudio() {
+        // 创建一个空的音频上下文，获取用户授权
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+            const ctx = new AudioContext();
+            ctx.resume().then(() => {
+                console.log('音频授权成功');
+                ctx.close();
+            });
+        }
+        // 隐藏提示框
+        document.getElementById('audioPermission').style.display = 'none';
+        // 播放一个测试音（可选）
+        const testAudio = new Audio('data:audio/wav;base64,U3RlYWx0aCBpcyBhIHRlc3Qu');
+        testAudio.play().catch(e => console.log('测试音被拦截，但授权已激活'));
+    }
+</script>
     <div class="doodle-bg">
         <div class="cloud cloud1"></div>
         <div class="cloud cloud2"></div>
@@ -341,10 +364,11 @@
                     const audioUrl = URL.createObjectURL(audioBlob);
                     const audio = new Audio(audioUrl);
                     audio.onended = () => URL.revokeObjectURL(audioUrl);
-                    audio.play().catch(err => {
-                        console.error('播放失败:', err);
-                        fallbackSpeak(text);
-                    });
+                   audio.play().catch(err => {
+    console.error('播放失败:', err);
+    // 如果被拦截，提示用户先点击页面
+    alert('请先点击页面任意位置，再点击喇叭播放语音');
+});
                 } else {
                     const errorText = await response.text();
                     console.error('百度语音返回错误:', errorText);
